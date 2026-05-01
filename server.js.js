@@ -25,8 +25,51 @@ const db = mysql.createConnection({
 });
 
 db.connect(err => {
-  if (err) console.log("❌ DB ERROR:", err);
-  else console.log("✅ MySQL Connected");
+  if (err) {
+    console.log("❌ DB ERROR:", err);
+  } else {
+    console.log("✅ MySQL Connected");
+
+    // 🔥 AUTO CREATE TABLES
+    db.query(`
+      CREATE TABLE IF NOT EXISTS temp_teachers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        tsc_no VARCHAR(50),
+        name VARCHAR(100),
+        phone VARCHAR(20),
+        password VARCHAR(100),
+        county VARCHAR(100),
+        subcounty VARCHAR(100),
+        school VARCHAR(150),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.query(`
+      CREATE TABLE IF NOT EXISTS teachers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        tsc_no VARCHAR(50),
+        name VARCHAR(100),
+        phone VARCHAR(20),
+        password VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.query(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        tsc_no VARCHAR(50),
+        phone VARCHAR(20),
+        amount INT DEFAULT 0,
+        mpesa_code VARCHAR(50),
+        status VARCHAR(20),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    console.log("✅ Tables ready");
+  }
 });
 
 // ================= SERVER =================
