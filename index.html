@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>JSS Teachers Support Platform</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
+  text-align:center;
+}
+
+.hero{ padding:30px 20px; }
+h1{ color:#22c55e; }
+
+.container{
+  max-width:420px;
+  margin:auto;
+  padding:20px;
+}
+
+input, select, button{
+  width:100%;
+  padding:12px;
+  margin:8px 0;
+  border:none;
+  border-radius:6px;
+}
+
+input, select{
+  background:#1e293b;
+  color:white;
+}
+
+button{
+  background:#22c55e;
+  color:black;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+button:hover{ background:#16a34a; }
+
+.hidden{ display:none; }
+
+#status{
+  margin-top:15px;
+  color:yellow;
+  font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<div class="hero">
+  <h1>🚀 JSS Teachers Unity Platform</h1>
+  <p>Connect • Organize • Advocate • Grow</p>
+  <h2 id="teacherCount">👩‍🏫 Loading...</h2>
+</div>
+
+<div class="container">
+
+  <!-- STEP 1 -->
+  <div id="step1">
+    <input id="tsc" placeholder="Enter TSC Number">
+    <button onclick="checkTSC()">Continue</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="loginBox" class="hidden">
+    <button onclick="goBack()">⬅ Back</button>
+
+    <input id="loginPassword" type="password" placeholder="Enter Password">
+    <button onclick="login()">Login</button>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="registerBox" class="hidden">
+    <button onclick="goBack()">⬅ Back</button>
+
+    <input id="name" placeholder="Full Name">
+
+    <select id="county" onchange="loadSubCounties()">
+      <option value="">Select County</option>
+    </select>
+
+    <select id="subcounty">
+      <option value="">Select Sub-County</option>
+    </select>
+
+    <input id="school" placeholder="School Name">
+    <input id="phone" placeholder="Phone (07XXXXXXXX)">
+    <input id="password" type="password" placeholder="Create Password">
+
+    <button onclick="registerAndPay()">Register & Pay Ksh 50</button>
+  </div>
+
+  <div id="status"></div>
+</div>
+
+<script>
+let currentTSC = "";
+
+/* ================= COUNT ================= */
+async function loadCount(){
+  try{
+    const res = await fetch("/count-teachers");
+    const data = await res.json();
+    document.getElementById("teacherCount").innerText =
+      "👩‍🏫 " + (data.total || 0) + " Teachers Registered";
+  }catch(e){}
+}
+setInterval(loadCount, 5000);
+loadCount();
+
+// ===== FULL 47 COUNTIES =====
+const counties = {
+"Baringo":["Baringo North","Baringo Central","Baringo South","Mogotio","Eldama Ravine","Tiaty"],
+"Bomet":["Sotik","Chepalungu","Bomet East","Bomet Central","Konoin"],
+"Bungoma":["Mt Elgon","Sirisia","Kabuchai","Bumula","Kanduyi","Webuye East","Webuye West","Kimilili","Tongaren"],
+"Busia":["Teso North","Teso South","Teso Central","Nambale","Matayos","Butula","Funyula","Budalangi"],
+"Elgeyo-Marakwet":["Marakwet East","Marakwet West","Keiyo North","Keiyo South"],
+"Embu":["Manyatta","Runyenjes","Mbeere South","Mbeere North"],
+"Garissa":["Garissa Township","Balambala","Lagdera","Dadaab","Fafi","Ijara"],
+"Homa Bay":["Kasipul","Kabondo Kasipul","Karachuonyo","Rangwe","Homa Bay Town","Ndhiwa","Suba North","Suba South"],
+"Isiolo":["Isiolo North","Isiolo South"],
+"Kajiado":["Kajiado North","Kajiado Central","Kajiado East","Kajiado West","Kajiado South"],
+"Kakamega":["Lugari","Likuyani","Malava","Lurambi","Navakholo","Mumias West","Mumias East","Matungu","Butere","Khwisero","Shinyalu","Ikolomani"],
+"Kericho":["Ainamoi","Belgut","Sigowet/Soin","Kipkelion East","Kipkelion West","Bureti"],
+"Kiambu":["Gatundu South","Gatundu North","Juja","Thika Town","Ruiru","Githunguri","Kiambu","Kiambaa","Kabete","Kikuyu","Limuru","Lari"],
+"Kilifi":["Kilifi North","Kilifi South","Kaloleni","Rabai","Ganze","Malindi","Magarini"],
+"Kirinyaga":["Mwea","Gichugu","Ndia","Kirinyaga Central"],
+"Kisii":["Bonchari","South Mugirango","Bomachoge Borabu","Bobasi","Bomachoge Chache","Nyaribari Masaba","Nyaribari Chache","Kitutu Chache North","Kitutu Chache South"],
+"Kisumu":["Kisumu East","Kisumu West","Kisumu Central","Seme","Nyando","Muhoroni","Nyakach"],
+"Kitui":["Mwingi North","Mwingi West","Mwingi Central","Kitui West","Kitui Rural","Kitui Central","Kitui East","Kitui South"],
+"Kwale":["Msambweni","Lunga Lunga","Matuga","Kinango"],
+"Laikipia":["Laikipia West","Laikipia East","Laikipia North"],
+"Lamu":["Lamu East","Lamu West"],
+"Machakos":["Masinga","Yatta","Kangundo","Matungulu","Kathiani","Mavoko","Machakos Town","Mwala"],
+"Makueni":["Mbooni","Kilome","Kaiti","Makueni","Kibwezi West","Kibwezi East"],
+"Mandera":["Mandera West","Banissa","Mandera North","Mandera South","Mandera East","Lafey"],
+"Marsabit":["Moyale","North Horr","Saku","Laisamis"],
+"Meru":["Igembe South","Igembe Central","Igembe North","Tigania West","Tigania East","North Imenti","Buuri","Central Imenti","South Imenti"],
+"Migori":["Rongo","Awendo","Suna East","Suna West","Uriri","Nyatike","Kuria West","Kuria East"],
+"Mombasa":["Changamwe","Jomvu","Kisauni","Nyali","Likoni","Mvita"],
+"Murang'a":["Kangema","Mathioya","Kiharu","Kigumo","Maragwa","Kandara","Gatanga"],
+"Nairobi":["Westlands","Dagoretti North","Dagoretti South","Langata","Kibra","Roysambu","Kasarani","Ruaraka","Embakasi South","Embakasi North","Embakasi Central","Embakasi East","Embakasi West","Makadara","Kamukunji","Starehe","Mathare"],
+"Nakuru":["Molo","Njoro","Naivasha","Gilgil","Kuresoi South","Kuresoi North","Subukia","Rongai","Bahati","Nakuru Town West","Nakuru Town East"],
+"Nandi":["Tinderet","Aldai","Nandi Hills","Chesumei","Emgwen","Mosop"],
+"Narok":["Narok North","Narok East","Narok South","Narok West","Trans Mara East","Trans Mara West"],
+"Nyamira":["Kitutu Masaba","West Mugirango","North Mugirango","Borabu"],
+"Nyandarua":["Kinangop","Kipipiri","Ol Kalou","Ol Jorok","Ndaragwa"],
+"Nyeri":["Tetu","Kieni","Mathira","Othaya","Mukurweini","Nyeri Town"],
+"Samburu":["Samburu West","Samburu North","Samburu East"],
+"Siaya":["Ugenya","Ugunja","Alego Usonga","Gem","Bondo","Rarieda"],
+"Taita Taveta":["Taveta","Wundanyi","Mwatate","Voi"],
+"Tana River":["Garsen","Galole","Bura"],
+"Tharaka-Nithi":["Maara","Chuka/Igambang'ombe","Tharaka"],
+"Trans Nzoia":["Kwanza","Endebess","Saboti","Kiminini","Cherangany"],
+"Turkana":["Turkana North","Turkana West","Turkana Central","Loima","Turkana South","Turkana East"],
+"Uasin Gishu":["Soy","Turbo","Moiben","Ainabkoi","Kapseret","Kesses"],
+"Vihiga":["Vihiga","Sabatia","Hamisi","Luanda","Emuhaya"],
+"Wajir":["Wajir North","Wajir East","Tarbaj","Wajir West","Eldas","Wajir South"],
+"West Pokot":["Kapenguria","Sigor","Kacheliba","Pokot South"]
+};
+
+
+/* LOAD COUNTIES */
+const countySelect = document.getElementById("county");
+Object.keys(counties).forEach(c=>{
+  const opt = document.createElement("option");
+  opt.value = c;
+  opt.text = c;
+  countySelect.add(opt);
+});
+
+/* LOAD SUBCOUNTIES */
+function loadSubCounties(){
+  const sub = document.getElementById("subcounty");
+  sub.innerHTML = "<option>Select Sub-County</option>";
+
+  (counties[county.value] || []).forEach(s=>{
+    const opt = document.createElement("option");
+    opt.text = s;
+    sub.add(opt);
+  });
+}
+
+/* ================= CHECK TSC ================= */
+async function checkTSC(){
+  const tsc = document.getElementById("tsc").value.trim();
+  if(!tsc) return alert("Enter TSC number");
+
+  currentTSC = tsc;
+
+  const res = await fetch("/check-tsc", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({tsc_no: tsc})
+  });
+
+  const data = await res.json();
+
+  step1.classList.add("hidden");
+
+  if(data.exists){
+    loginBox.classList.remove("hidden");
+  }else{
+    registerBox.classList.remove("hidden");
+  }
+}
+
+/* ================= LOGIN ================= */
+async function login(){
+  const password = document.getElementById("loginPassword").value;
+
+  const res = await fetch("/login", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      tsc_no: currentTSC,
+      password
+    })
+  });
+
+  const data = await res.json();
+
+  if(data.success){
+
+    localStorage.setItem("teacher", JSON.stringify({
+      id: currentTSC,
+      name: data.name || "Teacher"
+    }));
+
+    window.location.href = "/dashboard.html";
+
+  }else{
+    alert("Invalid login");
+  }
+}
+
+/* ================= REGISTER ================= */
+async function registerAndPay(){
+
+  const status = document.getElementById("status");
+
+  // ✅ SAFE GET ELEMENTS
+  const nameEl = document.getElementById("name");
+  const countyEl = document.getElementById("county");
+  const subcountyEl = document.getElementById("subcounty");
+  const schoolEl = document.getElementById("school");
+  const phoneEl = document.getElementById("phone");
+  const passwordEl = document.getElementById("password");
+
+  // ❌ CHECK IF ANY ELEMENT IS MISSING
+  if(!nameEl || !countyEl || !subcountyEl || !schoolEl || !phoneEl || !passwordEl){
+    console.error("❌ Missing input fields in HTML");
+    alert("Form error: reload page");
+    return;
+  }
+
+  // ✅ SAFE VALUES
+  const body = {
+    tsc_no: currentTSC,
+    name: nameEl.value.trim(),
+    county: countyEl.value,
+    subcounty: subcountyEl.value,
+    school: schoolEl.value.trim(),
+    phone: phoneEl.value.trim(),
+    password: passwordEl.value.trim()
+  };
+
+  // ✅ VALIDATION
+  if(!body.name || !body.phone || !body.password || !body.county){
+    return alert("Fill all required fields");
+  }
+
+  try{
+
+    status.innerText = "⏳ Saving details...";
+
+    const temp = await fetch("/save-teacher-temp", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(body)
+    });
+
+    const t = await temp.json();
+    if(!t.success) return alert("Save failed");
+
+    status.innerText = "📲 Sending payment request...";
+
+    await fetch("/pay", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(body)
+    });
+
+    status.innerText = "📲 Check your phone and enter M-PESA PIN";
+
+    const interval = setInterval(async ()=>{
+      const res = await fetch("/check-payment/" + currentTSC);
+      const d = await res.json();
+
+      if(d.paid){
+        clearInterval(interval);
+
+        status.innerText = "✅ Payment successful! Redirecting...";
+
+        localStorage.setItem("teacher", JSON.stringify({
+          id: currentTSC,
+          name: body.name
+        }));
+
+        setTimeout(()=>{
+          window.location.href = "/dashboard.html";
+        },1500);
+      }
+    },4000);
+
+  }catch(err){
+    console.error(err);
+    alert("Network error");
+  }
+}
+
+/* ================= UI ================= */
+function goBack(){
+  step1.classList.remove("hidden");
+  loginBox.classList.add("hidden");
+  registerBox.classList.add("hidden");
+}
+</script>
+<div style="
+  margin-top:40px;
+  padding:20px;
+  background:#020617;
+  border-top:1px solid #1e293b;
+">
+  <h3 style="color:#22c55e;">Need Help?</h3>
+
+  <p>
+    📧 Email: 
+    <a href="mailto:gramicciomondi60@gmail.com" style="color:#38bdf8;">
+      gramicciomondi60@gmail.com
+    </a>
+  </p>
+
+  <p>
+    💬 WhatsApp: 
+    <a href="https://wa.me/254713133007" target="_blank" style="color:#38bdf8;">
+      0713 133 007
+    </a>
+  </p>
+
+  <p style="font-size:13px; color:#94a3b8;">
+    We're here to assist you with registration, payments, and access to the platform.
+  </p>
+</div>
+</body>
+</html>
