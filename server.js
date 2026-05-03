@@ -12,7 +12,7 @@ const app = express();
 /* ================= MIDDLEWARE ================= */
 app.use(express.json());
 app.use(cors());
-app.use(express.static(__dirname));
+app.use(express.static("public"));
 
 /* ================= DATABASE ================= */
 const db = mysql.createPool({
