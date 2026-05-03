@@ -270,7 +270,27 @@ app.post("/callback", (req, res) => {
     res.json({ message: "error" });
   }
 });
+// CHECK TSC (prevent duplicate registration)
+app.post("/check-tsc", (req, res) => {
+  const { tsc_no } = req.body;
 
+  db.query(
+    "SELECT * FROM teachers WHERE tsc_no = ?",
+    [tsc_no],
+    (err, result) => {
+      if (err) {
+        console.log("❌ CHECK ERROR:", err);
+        return res.json({ exists: false });
+      }
+
+      if (result.length > 0) {
+        return res.json({ exists: true });
+      } else {
+        return res.json({ exists: false });
+      }
+    }
+  );
+});
 // COUNT
 app.get("/count-teachers", (req, res) => {
   db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
