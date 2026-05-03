@@ -26,7 +26,7 @@ const db = mysql.createPool({
   connectionLimit: 10
 });
 
-// ✅ Test connection
+// TEST CONNECTION
 db.getConnection((err, connection) => {
   if (err) {
     console.log("❌ DB CONNECTION ERROR:", err);
@@ -34,7 +34,6 @@ db.getConnection((err, connection) => {
     console.log("✅ Database Connected");
     connection.release();
 
-    // TABLES
     db.query(`
       CREATE TABLE IF NOT EXISTS temp_teachers (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -169,13 +168,11 @@ app.post("/pay", async (req, res) => {
       timestamp
     ).toString("base64");
 
-    // Save payment
     db.query(
       "INSERT INTO payments (tsc_no, phone, amount, status) VALUES (?, ?, 50, 'PENDING')",
       [tsc_no, phoneFormatted]
     );
 
-    // STK PUSH
     await axios.post(
       `${baseURL}/mpesa/stkpush/v1/processrequest`,
       {
@@ -203,69 +200,66 @@ app.post("/pay", async (req, res) => {
   }
 });
 
-// CALLBACK
+// CALLBACK (FIXED CLEAN)
 app.post("/callback", (req, res) => {
-console.log("📥 CALLBACK RECEIVED");
-console.log(JSON.stringify(req.body, null, 2));
+  console.log("📥 CALLBACK RECEIVED");
+  console.log(JSON.stringify(req.body, null, 2));
+
   try {
     const stk = req.body?.Body?.stkCallback;
 
-    if (!stk || !stk.CallbackMetadata) {
-      console.log("⚠️ No callback metadata");
-      return res.json({ message: "no data" });
+    if (!stk || stk.ResultCode !== 0 || !stk.CallbackMetadata) {
+      return res.json({ message: "ignored" });
     }
 
-    if (stk.ResultCode === 0) {
-      const items = stk.CallbackMetadata.Item;
+    const items = stk.CallbackMetadata.Item || [];
 
-      const code = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
-      const amount = items.find(i => i.Name === "Amount")?.Value;
-      const phoneRaw = items.find(i => i.Name === "PhoneNumber")?.Value;
-      const tsc_no = items.find(i => i.Name === "AccountReference")?.Value;
+    const code = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
+    const amount = items.find(i => i.Name === "Amount")?.Value;
+    const phoneRaw = items.find(i => i.Name === "PhoneNumber")?.Value;
+    const tsc_no = items.find(i => i.Name === "AccountReference")?.Value;
 
-      let phone = phoneRaw.toString();
-      if (phone.startsWith("254")) {
-        phone = "0" + phone.slice(3);
+    if (!code || !phoneRaw || !tsc_no) {
+      console.log("⚠️ Missing important fields");
+      return res.json({ message: "missing data" });
+    }
+
+    let phone = phoneRaw.toString();
+    if (phone.startsWith("254")) {
+      phone = "0" + phone.slice(3);
+    }
+
+    db.query(
+      "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
+      [code, amount, tsc_no]
+    );
+
+    db.query(
+      "SELECT * FROM temp_teachers WHERE phone=? ORDER BY id DESC LIMIT 1",
+      [phone],
+      (err, result) => {
+        if (!result || result.length === 0) return;
+
+        const t = result[0];
+
+        db.query(
+          "SELECT * FROM teachers WHERE tsc_no=?",
+          [t.tsc_no],
+          (err, exists) => {
+            if (exists.length > 0) return;
+
+            db.query(
+              "INSERT INTO teachers (tsc_no, name, phone, password) VALUES (?, ?, ?, ?)",
+              [t.tsc_no, t.name, t.phone, t.password]
+            );
+
+            console.log("🎉 TEACHER ACTIVATED:", t.tsc_no);
+          }
+        );
       }
+    );
 
-      // ✅ Update payment using TSC (FIXED)
-      db.query(
-        "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
-        [code, amount, tsc_no]
-      );
-
-      // Activate teacher
-      db.query(
-        "SELECT * FROM temp_teachers WHERE phone=? ORDER BY id DESC LIMIT 1",
-        [phone],
-        (err, result) => {
-          if (!result || result.length === 0) return;
-
-          const t = result[0];
-
-          db.query(
-            "SELECT * FROM teachers WHERE tsc_no=?",
-            [t.tsc_no],
-            (err, exists) => {
-              if (exists.length > 0) {
-                console.log("⚠️ Already activated:", t.tsc_no);
-                return;
-              }
-
-              db.query(
-                "INSERT INTO teachers (tsc_no, name, phone, password) VALUES (?, ?, ?, ?)",
-                [t.tsc_no, t.name, t.phone, t.password]
-              );
-
-              console.log("🎉 TEACHER ACTIVATED:", t.tsc_no);
-            }
-          );
-        }
-      );
-
-      console.log("✅ PAYMENT SUCCESS:", code);
-    }
-
+    console.log("✅ PAYMENT SUCCESS:", code);
     res.json({ message: "ok" });
 
   } catch (err) {
@@ -273,28 +267,16 @@ console.log(JSON.stringify(req.body, null, 2));
     res.json({ message: "error" });
   }
 });
-// CHECK TSC (prevent duplicate registration)
-app.post("/check-tsc", (req, res) => {
-  const { tsc_no } = req.body;
 
-  db.query(
-    "SELECT * FROM teachers WHERE tsc_no = ?",
-    [tsc_no],
-    (err, result) => {
-      if (err) {
-        console.log("❌ CHECK ERROR:", err);
-        return res.json({ exists: false });
-      }
-
-      if (result.length > 0) {
-        return res.json({ exists: true });
-      } else {
-        return res.json({ exists: false });
-      }
-    }
-  );
+// DEBUG PAYMENTS
+app.get("/debug-payments", (req, res) => {
+  db.query("SELECT * FROM payments ORDER BY id DESC LIMIT 10", (err, result) => {
+    if (err) return res.json([]);
+    res.json(result);
+  });
 });
-// CHECK PAYMENT STATUS
+
+// CHECK PAYMENT
 app.get("/check-payment/:tsc_no", (req, res) => {
   const { tsc_no } = req.params;
 
@@ -302,28 +284,12 @@ app.get("/check-payment/:tsc_no", (req, res) => {
     "SELECT * FROM payments WHERE tsc_no=? AND status='PAID' ORDER BY id DESC LIMIT 1",
     [tsc_no],
     (err, result) => {
-      if (err) {
-        console.log("❌ CHECK PAYMENT ERROR:", err);
-        return res.json({ paid: false });
-      }
-
-      if (result.length > 0) {
-        res.json({ paid: true });
-      } else {
-        res.json({ paid: false });
-      }
+      if (err) return res.json({ paid: false });
+      res.json({ paid: result.length > 0 });
     }
   );
 });
-app.get("/debug-payments", (req, res) => {
-  db.query("SELECT * FROM payments ORDER BY id DESC LIMIT 10", (err, result) => {
-    if (err) {
-      console.log("❌ DEBUG ERROR:", err);
-      return res.json([]);
-    }
-    res.json(result);
-  });
-});
+
 // COUNT
 app.get("/count-teachers", (req, res) => {
   db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
