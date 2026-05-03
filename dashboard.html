@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html>
 <head>
@@ -211,4 +212,219 @@ loadPolls();
 </script>
 
 </body>
+=======
+<!DOCTYPE html>
+<html>
+<head>
+<title>JSS Dashboard</title>
+<script src="/socket.io/socket.io.js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
+  display:flex;
+}
+.sidebar{
+  width:230px;
+  background:#020617;
+  height:100vh;
+  padding:10px;
+}
+.sidebar button{
+  width:100%;
+  padding:14px;
+  margin-bottom:10px;
+  border:none;
+  border-radius:8px;
+  background:#1e293b;
+  color:white;
+  cursor:pointer;
+}
+.sidebar button.active{ background:#22c55e; }
+.main{ flex:1; padding:20px; }
+.tab{
+  display:none;
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
+}
+.tab.active{display:block;}
+.card{
+  background:#020617;
+  padding:10px;
+  margin:8px 0;
+  border-radius:8px;
+}
+#chatBox{ height:250px; overflow:auto; }
+.logout{ background:red; }
+.error{ background:#7f1d1d; padding:10px; border-radius:8px; }
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+<button class="logout" onclick="logout()">Logout</button>
+
+<button class="active" onclick="openTab(event,'ann')">📢 Announcements</button>
+<button onclick="openTab(event,'swp')">🔁 Swaps</button>
+<button onclick="openTab(event,'materials')">📚 Revision</button>
+<button onclick="openTab(event,'chat')">💬 Chat</button>
+<button onclick="openTab(event,'polls')">🗳 Polls</button>
+</div>
+
+<div class="main">
+
+<h2>👩‍🏫 Teacher Dashboard</h2>
+<div id="online">🟢 Online (0)</div>
+<div id="errorBox"></div>
+
+<div id="ann" class="tab active"></div>
+<div id="swp" class="tab"></div>
+<div id="materials" class="tab"></div>
+
+<div id="chat" class="tab">
+  <div id="chatBox"></div>
+  <input id="msg" placeholder="Type message">
+  <button onclick="send()">Send</button>
+</div>
+
+<div id="polls" class="tab"></div>
+
+</div>
+
+<script>
+// ===== LOAD USER =====
+let teacher = JSON.parse(localStorage.getItem("teacher"));
+
+if(!teacher){
+ document.getElementById("errorBox").innerHTML =
+ `<div class="error">⚠️ Not logged in</div>`;
+}
+
+// ===== SOCKET =====
+const socket = io();
+if(teacher) socket.emit("join", teacher.name);
+
+// ===== ONLINE =====
+socket.on("onlineUsers", users=>{
+ document.getElementById("online").innerText =
+ "🟢 Online (" + users.length + ")";
+});
+
+// ===== CHAT =====
+socket.on("message", data=>{
+ chatBox.innerHTML += `<div class="card"><b>${data.name}</b>: ${data.message}</div>`;
+});
+
+function send(){
+ if(!teacher) return alert("Login required");
+ if(!msg.value) return;
+
+ socket.emit("chatMessage", {name: teacher.name, message: msg.value});
+ msg.value="";
+}
+
+// ===== TABS =====
+function openTab(e,id){
+ document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+ document.querySelectorAll(".sidebar button").forEach(b=>b.classList.remove("active"));
+
+ document.getElementById(id).classList.add("active");
+ e.currentTarget.classList.add("active");
+}
+
+// ===== LOGOUT =====
+function logout(){
+ localStorage.removeItem("teacher");
+ window.location.href="/";
+}
+
+// ===== ANNOUNCEMENTS =====
+async function loadAnnouncements(){
+ const res = await fetch("/announcements");
+ const data = await res.json();
+
+ ann.innerHTML = "<h3>📢 Announcements</h3>";
+ data.forEach(a=>{
+   ann.innerHTML += `<div class="card">${a.content}</div>`;
+ });
+}
+
+// ===== SWAPS =====
+async function loadSwaps(){
+ const res = await fetch("/swaps");
+ const data = await res.json();
+
+ swp.innerHTML = "<h3>🔁 Swaps</h3>";
+ data.forEach(s=>{
+   swp.innerHTML += `<div class="card"><b>${s.name}</b>: ${s.content}</div>`;
+ });
+}
+
+// ===== MATERIALS =====
+async function loadMaterials(){
+ const res = await fetch("/links");
+ const data = await res.json();
+
+ materials.innerHTML = "<h3>📚 Revision</h3>";
+ data.forEach(l=>{
+   if(l.url.includes(".pdf")){
+     materials.innerHTML += `<div class="card"><a href="${l.url}" target="_blank">${l.title}</a></div>`;
+   }
+ });
+}
+
+// ===== POLLS =====
+async function loadPolls(){
+ const res = await fetch("/polls");
+ const data = await res.json();
+
+ polls.innerHTML = "<h3>🗳 Polls</h3>";
+ data.forEach(p=>{
+   polls.innerHTML += `
+   <div class="card">
+     <h3>${p.question}</h3>
+     👍 ${p.yes_votes} | 👎 ${p.no_votes}
+     <br><br>
+     <button onclick="vote(${p.id},'yes')">Yes</button>
+     <button onclick="vote(${p.id},'no')">No</button>
+   </div>`;
+ });
+}
+
+async function vote(id,type){
+ await fetch("/vote",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body: JSON.stringify({
+     poll_id:id,
+     type:type,
+     teacher_id:teacher.id
+   })
+ });
+ loadPolls();
+}
+
+// AUTO LOAD
+setInterval(()=>{
+ loadAnnouncements();
+ loadSwaps();
+ loadMaterials();
+ loadPolls();
+},5000);
+
+// INITIAL
+loadAnnouncements();
+loadSwaps();
+loadMaterials();
+loadPolls();
+
+</script>
+
+</body>
+>>>>>>> a1fa6ca618479b2701435bb74e4070f409b1693a
 </html>

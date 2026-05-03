@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html>
 <head>
@@ -267,4 +268,275 @@ loadPaymentsToday();
 </script>
 
 </body>
+=======
+<!DOCTYPE html>
+<html>
+<head>
+<title>Admin Panel</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
+}
+
+.container{
+  max-width:900px;
+  margin:auto;
+  padding:20px;
+}
+
+h2{
+  text-align:center;
+}
+
+.card{
+  background:#1e293b;
+  padding:15px;
+  margin-bottom:20px;
+  border-radius:10px;
+}
+
+input, textarea, button{
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+  border:none;
+  border-radius:6px;
+}
+
+button{
+  background:#22c55e;
+  color:black;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#16a34a;
+}
+
+.list{
+  margin-top:10px;
+  background:#020617;
+  padding:10px;
+  border-radius:8px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>🛠 Admin Control Panel</h2>
+
+<!-- ANNOUNCEMENTS -->
+<div class="card">
+<h3>📢 Post Announcement</h3>
+<textarea id="annText"></textarea>
+<button onclick="postAnnouncement()">Post</button>
+<div id="annList" class="list"></div>
+</div>
+
+<!-- MATERIALS -->
+<div class="card">
+<h3>📚 Upload PDF</h3>
+<input id="matTitle" placeholder="Title">
+<input type="file" id="matFile">
+<button onclick="uploadMaterial()">Upload</button>
+<div id="matList" class="list"></div>
+</div>
+
+<!-- SWAPS -->
+<div class="card">
+<h3>🔁 Swaps</h3>
+<input id="swapName" placeholder="Name">
+<textarea id="swapText"></textarea>
+<button onclick="createSwap()">Create</button>
+<div id="swapList" class="list"></div>
+</div>
+
+
+
+<!-- POLLS -->
+<div class="card">
+<h3>🗳 Polls</h3>
+<input id="pollQ" placeholder="Question">
+<button onclick="createPoll()">Create</button>
+<div id="pollList" class="list"></div>
+</div>
+
+<!-- PAYMENTS -->
+<div class="card">
+<h3>💰 Today's Payments</h3>
+<p>Total: <span id="totalAmount">KES 0</span></p>
+<p>Transactions: <span id="totalCount">0</span></p>
+<div id="paymentList" class="list"></div>
+</div>
+
+</div>
+
+<script>
+const API = "";
+
+// ANNOUNCEMENTS
+async function postAnnouncement(){
+  await fetch("/announcements",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({content: annText.value})
+  });
+  annText.value="";
+  loadAnnouncements();
+}
+
+async function loadAnnouncements(){
+  const res = await fetch("/announcements");
+  const data = await res.json();
+  annList.innerHTML="";
+  data.forEach(a=>{
+    annList.innerHTML += `<p>${a.content}</p>`;
+  });
+}
+
+// SWAPS
+async function createSwap(){
+  await fetch("/swaps",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({name: swapName.value, content: swapText.value})
+  });
+  swapName.value="";
+  swapText.value="";
+  loadSwaps();
+}
+
+async function loadSwaps(){
+  const res = await fetch("/swaps");
+  const data = await res.json();
+  swapList.innerHTML="";
+  data.forEach(s=>{
+    swapList.innerHTML += `<p><b>${s.name}</b>: ${s.content}</p>`;
+  });
+}
+
+// LINKS
+async function addLink(){
+  await fetch("/links",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({title: linkTitle.value, url: linkUrl.value})
+  });
+  linkTitle.value="";
+  linkUrl.value="";
+  loadLinks();
+}
+
+async function loadLinks(){
+  const res = await fetch("/links");
+  const data = await res.json();
+  linkList.innerHTML="";
+  data.forEach(l=>{
+    linkList.innerHTML += `<p>${l.title}</p>`;
+  });
+}
+
+// MATERIALS
+async function uploadMaterial(){
+  const file = matFile.files[0];
+  if(!file) return alert("Select file");
+
+  const fd = new FormData();
+  fd.append("pdf", file);
+  fd.append("title", matTitle.value);
+
+  await fetch("/upload-pdf",{method:"POST",body:fd});
+  matTitle.value="";
+  matFile.value="";
+  loadMaterials();
+}
+
+async function loadMaterials(){
+  const res = await fetch("/links");
+  const data = await res.json();
+  matList.innerHTML="";
+  data.forEach(l=>{
+    if(l.url.includes(".pdf")){
+      matList.innerHTML += `<p><a href="${l.url}" target="_blank">${l.title}</a></p>`;
+    }
+  });
+}
+
+// POLLS
+async function createPoll(){
+  await fetch("/create-poll",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({question: pollQ.value})
+  });
+  pollQ.value="";
+  loadPolls();
+}
+
+async function loadPolls(){
+  const res = await fetch("/polls");
+  const data = await res.json();
+  pollList.innerHTML="";
+  data.forEach(p=>{
+    pollList.innerHTML += `<p>${p.question}</p>`;
+  });
+}
+
+// PAYMENTS SUMMARY
+async function loadPaymentSummary(){
+  const res = await fetch("/payments/summary/today");
+  const data = await res.json();
+
+  totalAmount.innerText = "KES " + (data.total_amount || 0);
+  totalCount.innerText = data.total_transactions || 0;
+}
+
+// PAYMENTS LIST
+async function loadPaymentsToday(){
+  const res = await fetch("/payments/today");
+  const data = await res.json();
+
+  paymentList.innerHTML="";
+  data.forEach(p=>{
+    paymentList.innerHTML += `
+      <p>
+      KES ${p.amount} | ${p.phone}<br>
+      ${p.mpesa_code || "Pending"} | 
+      ${new Date(p.created_at).toLocaleString()}
+      </p>`;
+  });
+}
+
+// AUTO LOAD
+setInterval(()=>{
+  loadAnnouncements();
+  loadSwaps();
+  loadLinks();
+  loadPolls();
+  loadMaterials();
+  loadPaymentSummary();
+  loadPaymentsToday();
+},4000);
+
+// INITIAL
+loadAnnouncements();
+loadSwaps();
+loadLinks();
+loadPolls();
+loadMaterials();
+loadPaymentSummary();
+loadPaymentsToday();
+
+</script>
+
+</body>
+>>>>>>> a1fa6ca618479b2701435bb74e4070f409b1693a
 </html>

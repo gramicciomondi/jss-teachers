@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "name": "jss-teachers",
   "version": "1.0.0",
@@ -5,4 +6,13 @@
   "scripts": {
     "start": "node server.js"
   }
+=======
+{
+  "name": "jss-teachers",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+>>>>>>> a1fa6ca618479b2701435bb74e4070f409b1693a
 }

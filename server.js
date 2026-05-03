@@ -291,6 +291,27 @@ app.post("/check-tsc", (req, res) => {
     }
   );
 });
+// CHECK PAYMENT STATUS
+app.get("/check-payment/:tsc_no", (req, res) => {
+  const { tsc_no } = req.params;
+
+  db.query(
+    "SELECT * FROM payments WHERE tsc_no=? AND status='PAID' ORDER BY id DESC LIMIT 1",
+    [tsc_no],
+    (err, result) => {
+      if (err) {
+        console.log("❌ CHECK PAYMENT ERROR:", err);
+        return res.json({ paid: false });
+      }
+
+      if (result.length > 0) {
+        res.json({ paid: true });
+      } else {
+        res.json({ paid: false });
+      }
+    }
+  );
+});
 // COUNT
 app.get("/count-teachers", (req, res) => {
   db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
