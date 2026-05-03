@@ -314,10 +314,6 @@ app.get("/check-payment/:tsc_no", (req, res) => {
     }
   );
 });
-db.query(
-  "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
-  const code = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
-);
 // COUNT
 app.get("/count-teachers", (req, res) => {
   db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
