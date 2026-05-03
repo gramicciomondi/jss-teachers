@@ -144,6 +144,56 @@ app.post("/save-teacher-temp", (req, res) => {
   );
 });
 
+// CHECK TSC (ONLY ONE VERSION)
+app.post("/check-tsc", (req, res) => {
+  const { tsc_no } = req.body;
+
+  if (!tsc_no) return res.json({ exists: false });
+
+  db.query(
+    "SELECT id, tsc_no, name FROM teachers WHERE tsc_no=?",
+    [tsc_no],
+    (err, result) => {
+      if (err) {
+        console.log("❌ CHECK ERROR:", err);
+        return res.json({ exists: false });
+      }
+
+      if (result.length > 0) {
+        res.json({ exists: true, teacher: result[0] });
+      } else {
+        res.json({ exists: false });
+      }
+    }
+  );
+});
+
+// LOGIN
+app.post("/login", (req, res) => {
+  const { tsc_no, password } = req.body;
+
+  if (!tsc_no || !password) {
+    return res.json({ success: false });
+  }
+
+  db.query(
+    "SELECT id, tsc_no, name FROM teachers WHERE tsc_no=? AND password=?",
+    [tsc_no, password],
+    (err, result) => {
+      if (err) {
+        console.log("❌ LOGIN ERROR:", err);
+        return res.json({ success: false });
+      }
+
+      if (result.length > 0) {
+        res.json({ success: true, teacher: result[0] });
+      } else {
+        res.json({ success: false });
+      }
+    }
+  );
+});
+
 // PAY
 app.post("/pay", async (req, res) => {
   try {
@@ -200,10 +250,9 @@ app.post("/pay", async (req, res) => {
   }
 });
 
-// CALLBACK (FIXED CLEAN)
+// CALLBACK
 app.post("/callback", (req, res) => {
   console.log("📥 CALLBACK RECEIVED");
-  console.log(JSON.stringify(req.body, null, 2));
 
   try {
     const stk = req.body?.Body?.stkCallback;
@@ -212,22 +261,15 @@ app.post("/callback", (req, res) => {
       return res.json({ message: "ignored" });
     }
 
-    const items = stk.CallbackMetadata.Item || [];
+    const items = stk.CallbackMetadata.Item;
 
     const code = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
     const amount = items.find(i => i.Name === "Amount")?.Value;
     const phoneRaw = items.find(i => i.Name === "PhoneNumber")?.Value;
     const tsc_no = items.find(i => i.Name === "AccountReference")?.Value;
 
-    if (!code || !phoneRaw || !tsc_no) {
-      console.log("⚠️ Missing important fields");
-      return res.json({ message: "missing data" });
-    }
-
     let phone = phoneRaw.toString();
-    if (phone.startsWith("254")) {
-      phone = "0" + phone.slice(3);
-    }
+    if (phone.startsWith("254")) phone = "0" + phone.slice(3);
 
     db.query(
       "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
@@ -259,7 +301,6 @@ app.post("/callback", (req, res) => {
       }
     );
 
-    console.log("✅ PAYMENT SUCCESS:", code);
     res.json({ message: "ok" });
 
   } catch (err) {
@@ -268,41 +309,11 @@ app.post("/callback", (req, res) => {
   }
 });
 
-// DEBUG PAYMENTS
-app.get("/debug-payments", (req, res) => {
-  db.query("SELECT * FROM payments ORDER BY id DESC LIMIT 10", (err, result) => {
-    if (err) return res.json([]);
-    res.json(result);
-  });
-});
-app.post("/check-tsc", (req, res) => {
-  const { tsc_no } = req.body;
-
-  if (!tsc_no) {
-    return res.json({ exists: false });
-  }
-
-  db.query(
-    "SELECT * FROM teachers WHERE tsc_no = ?",
-    [tsc_no],
-    (err, result) => {
-      if (err) {
-        console.log("❌ CHECK ERROR:", err);
-        return res.json({ exists: false });
-      }
-
-      res.json({ exists: result.length > 0 });
-    }
-  );
-});
-
-// CHECK PAYMENT
-app.get("/check-payment/:tsc_no", (req, res) => {
-  const { tsc_no } = req.params;
-
+// CHECK PAYMENT (CORRECT)
+app.get("/check-payment/:tsc", (req, res) => {
   db.query(
     "SELECT * FROM payments WHERE tsc_no=? AND status='PAID' ORDER BY id DESC LIMIT 1",
-    [tsc_no],
+    [req.params.tsc],
     (err, result) => {
       if (err) return res.json({ paid: false });
       res.json({ paid: result.length > 0 });
@@ -310,15 +321,19 @@ app.get("/check-payment/:tsc_no", (req, res) => {
   );
 });
 
+// DEBUG
+app.get("/debug-payments", (req, res) => {
+  db.query("SELECT * FROM payments ORDER BY id DESC LIMIT 10", (err, result) => {
+    if (err) return res.json([]);
+    res.json(result);
+  });
+});
+
 // COUNT
 app.get("/count-teachers", (req, res) => {
   db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
     if (err) return res.json({ total: 23058 });
-
-    const base = 23058;
-    const dbCount = result[0].total || 0;
-
-    res.json({ total: base + dbCount });
+    res.json({ total: 23058 + (result[0].total || 0) });
   });
 });
 
