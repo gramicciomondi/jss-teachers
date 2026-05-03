@@ -204,7 +204,8 @@ app.post("/pay", async (req, res) => {
 });
 
 // CALLBACK
-
+console.log("📥 CALLBACK RECEIVED");
+console.log(JSON.stringify(req.body, null, 2));
 app.post("/callback", (req, res) => {
   try {
     const stk = req.body?.Body?.stkCallback;
