@@ -213,18 +213,21 @@ app.post("/callback", (req, res) => {
       return res.json({ message: "no data" });
     }
 
-    if (stk.ResultCode === 0) {
-      const items = stk.CallbackMetadata.Item;
+if (stk.ResultCode === 0) {
+  const items = stk.CallbackMetadata.Item;
 
-      const code = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
-      let phone = items.find(i => i.Name === "PhoneNumber")?.Value;
-      const amount = items.find(i => i.Name === "Amount")?.Value;
+  const code = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
+  const amount = items.find(i => i.Name === "Amount")?.Value;
+  const tsc_no = items.find(i => i.Name === "AccountReference")?.Value;
 
-      phone = phone.toString();
-      if (phone.startsWith("254")) {
-        phone = "0" + phone.slice(3);
-      }
+  // ✅ FIXED: update using tsc_no
+  db.query(
+    "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
+    [code, amount, tsc_no]
+  );
 
+  console.log("✅ PAYMENT SUCCESS:", code);
+}
       // Update payment
       db.query(
   "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
@@ -314,7 +317,7 @@ app.get("/check-payment/:tsc_no", (req, res) => {
 });
 db.query(
   "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
-  [code, amount, stk.CallbackMetadata.Item.find(i => i.Name === "AccountReference")?.Value]
+  const code = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
 );
 // COUNT
 app.get("/count-teachers", (req, res) => {
