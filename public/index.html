@@ -104,7 +104,6 @@ button:hover{ background:#16a34a; }
 </div>
 
 <script>
-let currentTSC = "";
 
 /* ================= COUNT ================= */
 async function loadCount(){
@@ -192,26 +191,32 @@ function loadSubCounties(){
 }
 
 /* ================= CHECK TSC ================= */
-async function checkTSC(){
-  const tsc = document.getElementById("tsc").value.trim();
-  if(!tsc) return alert("Enter TSC number");
+let currentTSC = "";
 
-  currentTSC = tsc;
+async function checkTSC() {
+  const tsc_no = document.getElementById("tsc").value;
 
-  const res = await fetch("/check-tsc", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({tsc_no: tsc})
-  });
+  try {
+    const res = await fetch("https://jss-teachers.onrender.com/check-tsc", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ tsc_no })
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  step1.classList.add("hidden");
+    if (data.exists) {
+      alert("❌ TSC already registered");
+    } else {
+      alert("✅ Proceed to payment");
+      currentTSC = tsc_no;
+    }
 
-  if(data.exists){
-    loginBox.classList.remove("hidden");
-  }else{
-    registerBox.classList.remove("hidden");
+  } catch (err) {
+    console.log("❌ ERROR:", err);
+    alert("Server error");
   }
 }
 
@@ -469,7 +474,6 @@ button:hover{ background:#16a34a; }
 </div>
 
 <script>
-let currentTSC = "";
 
 /* ================= COUNT ================= */
 async function loadCount(){
