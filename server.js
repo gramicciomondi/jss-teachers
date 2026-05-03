@@ -278,11 +278,19 @@ app.get("/debug-payments", (req, res) => {
 app.post("/check-tsc", (req, res) => {
   const { tsc_no } = req.body;
 
+  if (!tsc_no) {
+    return res.json({ exists: false });
+  }
+
   db.query(
     "SELECT * FROM teachers WHERE tsc_no = ?",
     [tsc_no],
     (err, result) => {
-      if (err) return res.json({ exists: false });
+      if (err) {
+        console.log("❌ CHECK ERROR:", err);
+        return res.json({ exists: false });
+      }
+
       res.json({ exists: result.length > 0 });
     }
   );
