@@ -204,6 +204,7 @@ app.post("/pay", async (req, res) => {
 });
 
 // CALLBACK
+
 app.post("/callback", (req, res) => {
   try {
     const stk = req.body?.Body?.stkCallback;
@@ -213,28 +214,26 @@ app.post("/callback", (req, res) => {
       return res.json({ message: "no data" });
     }
 
-if (stk.ResultCode === 0) {
-  const items = stk.CallbackMetadata.Item;
+    if (stk.ResultCode === 0) {
+      const items = stk.CallbackMetadata.Item;
 
-  const code = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
-  const amount = items.find(i => i.Name === "Amount")?.Value;
-  const tsc_no = items.find(i => i.Name === "AccountReference")?.Value;
+      const code = items.find(i => i.Name === "MpesaReceiptNumber")?.Value;
+      const amount = items.find(i => i.Name === "Amount")?.Value;
+      const phoneRaw = items.find(i => i.Name === "PhoneNumber")?.Value;
+      const tsc_no = items.find(i => i.Name === "AccountReference")?.Value;
 
-  // ✅ FIXED: update using tsc_no
-  db.query(
-    "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
-    [code, amount, tsc_no]
-  );
+      let phone = phoneRaw.toString();
+      if (phone.startsWith("254")) {
+        phone = "0" + phone.slice(3);
+      }
 
-  console.log("✅ PAYMENT SUCCESS:", code);
-}
-      // Update payment
+      // ✅ Update payment using TSC (FIXED)
       db.query(
-  "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
-  [code, amount, stk.CallbackMetadata.Item.find(i => i.Name === "AccountReference")?.Value]
-);
+        "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
+        [code, amount, tsc_no]
+      );
 
-      // Activate teacher (NO DUPLICATES)
+      // Activate teacher
       db.query(
         "SELECT * FROM temp_teachers WHERE phone=? ORDER BY id DESC LIMIT 1",
         [phone],
