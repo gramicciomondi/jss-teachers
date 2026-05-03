@@ -275,6 +275,18 @@ app.get("/debug-payments", (req, res) => {
     res.json(result);
   });
 });
+app.post("/check-tsc", (req, res) => {
+  const { tsc_no } = req.body;
+
+  db.query(
+    "SELECT * FROM teachers WHERE tsc_no = ?",
+    [tsc_no],
+    (err, result) => {
+      if (err) return res.json({ exists: false });
+      res.json({ exists: result.length > 0 });
+    }
+  );
+});
 
 // CHECK PAYMENT
 app.get("/check-payment/:tsc_no", (req, res) => {
