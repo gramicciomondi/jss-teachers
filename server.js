@@ -227,9 +227,9 @@ app.post("/callback", (req, res) => {
 
       // Update payment
       db.query(
-        "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE phone=? ORDER BY id DESC LIMIT 1",
-        [code, amount, phone]
-      );
+  "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
+  [code, amount, stk.CallbackMetadata.Item.find(i => i.Name === "AccountReference")?.Value]
+);
 
       // Activate teacher (NO DUPLICATES)
       db.query(
@@ -312,6 +312,10 @@ app.get("/check-payment/:tsc_no", (req, res) => {
     }
   );
 });
+db.query(
+  "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE tsc_no=? ORDER BY id DESC LIMIT 1",
+  [code, amount, stk.CallbackMetadata.Item.find(i => i.Name === "AccountReference")?.Value]
+);
 // COUNT
 app.get("/count-teachers", (req, res) => {
   db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
