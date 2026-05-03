@@ -314,6 +314,15 @@ app.get("/check-payment/:tsc_no", (req, res) => {
     }
   );
 });
+app.get("/debug-payments", (req, res) => {
+  db.query("SELECT * FROM payments ORDER BY id DESC LIMIT 10", (err, result) => {
+    if (err) {
+      console.log("❌ DEBUG ERROR:", err);
+      return res.json([]);
+    }
+    res.json(result);
+  });
+});
 // COUNT
 app.get("/count-teachers", (req, res) => {
   db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
