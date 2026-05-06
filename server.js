@@ -34,7 +34,7 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-/* ================= DATABASE (HARD FIX) ================= */
+/* ================= DATABASE ================= */
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -58,7 +58,7 @@ db.getConnection((err, conn) => {
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-/* ================= SOCKET SAFE ================= */
+/* ================= SOCKET ================= */
 let users = [];
 
 io.on("connection", (socket) => {
@@ -80,7 +80,42 @@ io.on("connection", (socket) => {
   });
 });
 
-/* ================= COUNT (FIXED + SAFE) ================= */
+/* ================= SAVE TEACHER TEMP ================= */
+app.post("/save-teacher-temp", (req, res) => {
+  try {
+    const { tsc_no, name, phone, password, county, subcounty, school } = req.body;
+
+    if (!tsc_no || !name || !phone) {
+      return res.json({ success: false });
+    }
+
+    const sql = `
+      INSERT INTO temp_teachers 
+      (tsc_no, name, phone, password, county, subcounty, school)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE name=VALUES(name), phone=VALUES(phone)
+    `;
+
+    db.query(
+      sql,
+      [tsc_no, name, phone, password, county, subcounty, school],
+      (err) => {
+        if (err) {
+          console.log("TEMP ERROR:", err.message);
+          return res.json({ success: false });
+        }
+
+        res.json({ success: true });
+      }
+    );
+
+  } catch (e) {
+    console.log("TEMP CRASH:", e.message);
+    res.json({ success: false });
+  }
+});
+
+/* ================= COUNT ================= */
 app.get("/count-teachers", (req, res) => {
   try {
     db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
@@ -138,7 +173,7 @@ app.post("/check-tsc", (req, res) => {
   );
 });
 
-/* ================= SAFE SERVER START ================= */
+/* ================= START ================= */
 const PORT = process.env.PORT || 10000;
 
 server.listen(PORT, "0.0.0.0", () => {
