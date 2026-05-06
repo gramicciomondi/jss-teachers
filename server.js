@@ -34,7 +34,7 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-/* ================= DATABASE (STABLE POOL) ================= */
+/* ================= DATABASE ================= */
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -47,7 +47,7 @@ const db = mysql.createPool({
 
 db.getConnection((err, conn) => {
   if (err) {
-    console.log("❌ DB CONNECTION FAILED:", err.message);
+    console.log("❌ DB FAILED:", err.message);
   } else {
     console.log("✅ DB CONNECTED");
     conn.release();
@@ -58,7 +58,7 @@ db.getConnection((err, conn) => {
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-/* ================= SOCKET ================= */
+/* ================= SOCKET REAL-TIME ================= */
 let users = [];
 
 io.on("connection", (socket) => {
@@ -87,14 +87,17 @@ app.post("/save-teacher-temp", (req, res) => {
       return res.json({ success: false });
     }
 
-    db.query(
-      `INSERT INTO temp_teachers 
+    const sql = `
+      INSERT INTO temp_teachers 
       (tsc_no, name, phone, password, county, subcounty, school)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE name=VALUES(name), phone=VALUES(phone)`,
+      ON DUPLICATE KEY UPDATE 
+        name=VALUES(name),
+        phone=VALUES(phone)
+    `;
 
+    db.query(sql,
       [tsc_no, name, phone, password, county, subcounty, school],
-
       (err) => {
         if (err) {
           console.log("TEMP ERROR:", err.message);
@@ -164,7 +167,7 @@ app.post("/login", (req, res) => {
   );
 });
 
-/* ================= PAY (SAFE VERSION) ================= */
+/* ================= PAY (REAL-TIME READY) ================= */
 app.post("/pay", async (req, res) => {
   try {
     const { tsc_no, phone } = req.body;
@@ -229,7 +232,7 @@ app.post("/pay", async (req, res) => {
   }
 });
 
-/* ================= CALLBACK ================= */
+/* ================= CALLBACK (PRODUCTION SAFE + REAL-TIME PUSH) ================= */
 app.post("/callback", (req, res) => {
   try {
     const stk = req.body?.Body?.stkCallback;
@@ -247,6 +250,14 @@ app.post("/callback", (req, res) => {
           "UPDATE payments SET status='PAID', mpesa_code=?, amount=? WHERE phone=? ORDER BY id DESC LIMIT 1",
           [code, amount, phone]
         );
+
+        /* 🔥 REAL-TIME PUSH TO FRONTEND */
+        io.emit("paymentUpdate", {
+          phone,
+          status: "PAID",
+          code,
+          amount
+        });
       }
     }
 
