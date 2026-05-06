@@ -15,9 +15,9 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
 
-/* ================= HEALTH CHECK (IMPORTANT FOR RENDER) ================= */
+/* ================= HEALTH CHECK ================= */
 app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.status(200).json({ status: "ok" });
 });
 
 /* ================= ROOT ================= */
@@ -25,20 +25,24 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-/* ================= DATABASE ================= */
+/* ================= DATABASE (RENDER SAFE) ================= */
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+  connectionLimit: 5,
+  queueLimit: 0,
+  connectTimeout: 20000
 });
 
 db.getConnection((err) => {
-  if (err) console.log("❌ DB ERROR:", err.message);
-  else console.log("✅ Database Connected");
+  if (err) {
+    console.log("❌ DB CONNECTION FAILED:", err.message);
+  } else {
+    console.log("✅ DATABASE CONNECTED");
+  }
 });
 
 /* ================= SERVER ================= */
@@ -51,11 +55,7 @@ let users = [];
 io.on("connection", (socket) => {
   socket.on("join", (name) => {
     socket.name = name;
-
-    if (!users.includes(name)) {
-      users.push(name);
-    }
-
+    if (name && !users.includes(name)) users.push(name);
     io.emit("onlineUsers", users);
   });
 
@@ -88,14 +88,14 @@ async function getAccessToken() {
 
     return res.data.access_token;
   } catch (err) {
-    console.log("❌ TOKEN ERROR:", err.message);
+    console.log("TOKEN ERROR:", err.message);
     return null;
   }
 }
 
 /* ================= SAVE TEMP ================= */
 app.post("/save-teacher-temp", (req, res) => {
-  const data = req.body;
+  const d = req.body;
 
   const sql = `
     INSERT INTO temp_teachers
@@ -106,21 +106,13 @@ app.post("/save-teacher-temp", (req, res) => {
 
   db.query(
     sql,
-    [
-      data.tsc_no,
-      data.name,
-      data.phone,
-      data.password,
-      data.county,
-      data.subcounty,
-      data.school
-    ],
+    [d.tsc_no, d.name, d.phone, d.password, d.county, d.subcounty, d.school],
     (err) => {
       if (err) {
         console.log("TEMP ERROR:", err.message);
-        return res.json({ success: false });
+        return res.status(200).json({ success: false });
       }
-      res.json({ success: true });
+      res.status(200).json({ success: true });
     }
   );
 });
@@ -130,10 +122,11 @@ app.post("/pay", async (req, res) => {
   try {
     const { tsc_no, phone } = req.body;
 
-    const cleanPhone = phone.replace(/^0/, "254");
+    const cleanPhone = phone?.replace(/^0/, "254");
+    if (!cleanPhone) return res.json({ success: false });
 
     const token = await getAccessToken();
-    if (!token) return res.json({ success: false, msg: "Token failed" });
+    if (!token) return res.json({ success: false });
 
     const timestamp = new Date()
       .toISOString()
@@ -142,8 +135,8 @@ app.post("/pay", async (req, res) => {
 
     const password = Buffer.from(
       process.env.MPESA_SHORTCODE +
-      process.env.MPESA_PASSKEY +
-      timestamp
+        process.env.MPESA_PASSKEY +
+        timestamp
     ).toString("base64");
 
     db.query(
@@ -170,6 +163,7 @@ app.post("/pay", async (req, res) => {
     );
 
     res.json({ success: true });
+
   } catch (err) {
     console.log("MPESA ERROR:", err.message);
     res.json({ success: false });
@@ -198,6 +192,7 @@ app.post("/callback", (req, res) => {
     }
 
     res.json({ ok: true });
+
   } catch (err) {
     console.log("CALLBACK ERROR:", err.message);
     res.json({ ok: true });
@@ -210,28 +205,36 @@ app.post("/check-tsc", (req, res) => {
     "SELECT id FROM teachers WHERE tsc_no=?",
     [req.body.tsc_no],
     (err, result) => {
-      if (err) {
-        console.log(err.message);
-        return res.json({ exists: false });
-      }
-
-      res.json({ exists: result.length > 0 });
+      if (err) return res.json({ exists: false });
+      res.json({ exists: result?.length > 0 });
     }
   );
 });
 
-/* ================= COUNT ================= */
+/* ================= COUNT (FIXED FOR 502/503) ================= */
 app.get("/count-teachers", (req, res) => {
-  db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
-    if (err) {
-      return res.json({ total: 23058 });
-    }
+  const fallback = 23058;
 
-    const base = 23058;
-    const count = result?.[0]?.total || 0;
+  try {
+    db.query(
+      "SELECT COUNT(*) AS total FROM teachers",
+      (err, result) => {
+        if (err) {
+          console.log("COUNT ERROR:", err.message);
+          return res.status(200).json({ total: fallback });
+        }
 
-    res.json({ total: base + count });
-  });
+        const dbCount = result?.[0]?.total || 0;
+
+        return res.status(200).json({
+          total: fallback + dbCount
+        });
+      }
+    );
+  } catch (e) {
+    console.log("COUNT CRASH:", e.message);
+    res.status(200).json({ total: fallback });
+  }
 });
 
 /* ================= LOGIN ================= */
