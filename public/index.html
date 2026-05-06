@@ -12,6 +12,7 @@ body{
   color:white;
   text-align:center;
 }
+
 .hero{ padding:30px 20px; }
 h1{ color:#22c55e; }
 
@@ -42,15 +43,21 @@ button{
 }
 
 .hidden{ display:none; }
-#status{ color:yellow; margin-top:10px; }
+
+#status{
+  margin-top:15px;
+  color:yellow;
+  font-weight:bold;
+}
 </style>
 </head>
 
 <body>
 
 <div class="hero">
-  <h1>🚀 JSS Teachers Platform</h1>
-  <h2 id="teacherCount">Loading...</h2>
+  <h1>🚀 JSS Teachers Unity Platform</h1>
+  <p>Connect • Organize • Advocate • Grow</p>
+  <h2 id="teacherCount">👩‍🏫 Loading...</h2>
 </div>
 
 <div class="container">
@@ -61,149 +68,204 @@ button{
   </div>
 
   <div id="loginBox" class="hidden">
+    <button onclick="goBack()">⬅ Back</button>
     <input id="loginPassword" type="password" placeholder="Enter Password">
     <button onclick="login()">Login</button>
   </div>
 
   <div id="registerBox" class="hidden">
+    <button onclick="goBack()">⬅ Back</button>
 
     <input id="name" placeholder="Full Name">
 
-    <select id="county" onchange="loadSub()"></select>
-    <select id="subcounty"></select>
+    <select id="county" onchange="loadSubCounties()">
+      <option value="">Select County</option>
+    </select>
 
-    <input id="school" placeholder="School">
-    <input id="phone" placeholder="Phone">
-    <input id="password" type="password" placeholder="Password">
+    <select id="subcounty">
+      <option value="">Select Sub-County</option>
+    </select>
 
-    <button onclick="register()">Register & Pay KSh 50</button>
+    <input id="school" placeholder="School Name">
+    <input id="phone" placeholder="Phone (07XXXXXXXX)">
+    <input id="password" type="password" placeholder="Create Password">
+
+    <button onclick="registerAndPay()">Register & Pay Ksh 50</button>
   </div>
 
+  <div id="status"></div>
 </div>
 
 <script>
-/* ================= GLOBAL STATE ================= */
+
+/* ================= SAFE GLOBAL ================= */
 let currentTSC = "";
+
+/* alias fix for older code mistakes */
+const countiesData = {}; // prevents undefined crashes
 
 /* ================= COUNT ================= */
 async function loadCount(){
-  try {
+  try{
     const res = await fetch("/count-teachers");
+    if(!res.ok) return;
+
     const data = await res.json();
     document.getElementById("teacherCount").innerText =
       "👩‍🏫 " + (data.total || 0) + " Teachers Registered";
-  } catch(e){
-    document.getElementById("teacherCount").innerText = "Loading failed";
-  }
+  }catch(e){}
 }
+
+setInterval(loadCount, 5000);
 loadCount();
-setInterval(loadCount, 10000);
 
 /* ================= COUNTIES ================= */
 const counties = {
-"Nairobi":["Westlands","Kasarani","Langata"],
-"Kiambu":["Thika","Ruiru","Kiambu"],
-"Mombasa":["Nyali","Likoni","Mvita"]
+  "Nairobi":["Westlands","Kibra","Kasarani"],
+  "Kiambu":["Thika","Ruiru"],
+  "Nakuru":["Naivasha","Gilgil"]
 };
 
-const countyEl = document.getElementById("county");
-countyEl.innerHTML = `<option value="">Select County</option>`;
+/* LOAD COUNTIES */
+const countySelect = document.getElementById("county");
 
 Object.keys(counties).forEach(c=>{
-  countyEl.innerHTML += `<option>${c}</option>`;
+  const opt = document.createElement("option");
+  opt.value = c;
+  opt.text = c;
+  countySelect.add(opt);
 });
 
-function loadSub(){
-  const c = countyEl.value;
+/* LOAD SUBCOUNTIES */
+function loadSubCounties(){
+  const countyEl = document.getElementById("county");
   const sub = document.getElementById("subcounty");
-  sub.innerHTML = "";
-  (counties[c] || []).forEach(s=>{
-    sub.innerHTML += `<option>${s}</option>`;
+
+  sub.innerHTML = "<option>Select Sub-County</option>";
+
+  (counties[countyEl.value] || []).forEach(s=>{
+    const opt = document.createElement("option");
+    opt.text = s;
+    sub.add(opt);
   });
 }
 
 /* ================= CHECK TSC ================= */
 async function checkTSC(){
-  const tsc = document.getElementById("tsc").value.trim();
-  if(!tsc) return alert("Enter TSC");
+  const tscInput = document.getElementById("tsc");
 
-  currentTSC = tsc;
+  if(!tscInput.value.trim()) return alert("Enter TSC number");
 
-  const res = await fetch("/check-tsc", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({tsc_no: tsc})
-  });
+  currentTSC = tscInput.value.trim();
 
-  const data = await res.json();
+  try{
+    const res = await fetch("/check-tsc", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({tsc_no: currentTSC})
+    });
 
-  document.getElementById("step1").classList.add("hidden");
+    if(!res.ok) throw new Error("Server error");
 
-  if(data.exists){
-    document.getElementById("loginBox").classList.remove("hidden");
-  }else{
-    document.getElementById("registerBox").classList.remove("hidden");
+    const data = await res.json();
+
+    step1.classList.add("hidden");
+
+    if(data.exists){
+      loginBox.classList.remove("hidden");
+    }else{
+      registerBox.classList.remove("hidden");
+    }
+
+  }catch(err){
+    alert("Server not responding");
   }
 }
 
 /* ================= LOGIN ================= */
 async function login(){
-  const password = document.getElementById("loginPassword").value;
+  try{
+    const password = document.getElementById("loginPassword").value;
 
-  const res = await fetch("/login", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({
-      tsc_no: currentTSC,
-      password
-    })
-  });
+    const res = await fetch("/login", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        tsc_no: currentTSC,
+        password
+      })
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if(data.success){
-    localStorage.setItem("teacher", JSON.stringify(data.teacher));
-    window.location.href = "/dashboard.html";
-  }else{
-    alert("Wrong password");
+    if(data.success){
+      localStorage.setItem("teacher", JSON.stringify({
+        id: currentTSC,
+        name: data.teacher?.name || "Teacher"
+      }));
+
+      window.location.href = "/dashboard.html";
+    }else{
+      alert("Invalid login");
+    }
+
+  }catch(e){
+    alert("Login failed");
   }
 }
 
 /* ================= REGISTER ================= */
-async function register(){
+async function registerAndPay(){
+
+  const status = document.getElementById("status");
+
   const body = {
     tsc_no: currentTSC,
-    name: name.value,
-    county: county.value,
-    subcounty: subcounty.value,
-    school: school.value,
-    phone: phone.value,
-    password: password.value
+    name: document.getElementById("name").value.trim(),
+    county: document.getElementById("county").value,
+    subcounty: document.getElementById("subcounty").value,
+    school: document.getElementById("school").value.trim(),
+    phone: document.getElementById("phone").value.trim(),
+    password: document.getElementById("password").value.trim()
   };
 
-  await fetch("/save-teacher-temp", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(body)
-  });
+  if(!body.name || !body.phone || !body.password){
+    return alert("Fill all fields");
+  }
 
-  await fetch("/pay", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(body)
-  });
+  try{
+    status.innerText = "Saving...";
 
-  const check = setInterval(async ()=>{
-    const res = await fetch("/check-payment/" + currentTSC);
-    const d = await res.json();
+    const save = await fetch("/save-teacher-temp", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(body)
+    });
 
-    if(d.paid){
-      clearInterval(check);
-      localStorage.setItem("teacher", JSON.stringify(body));
-      window.location.href = "/dashboard.html";
-    }
-  }, 4000);
+    if(!save.ok) throw new Error();
+
+    status.innerText = "Sending M-PESA request...";
+
+    await fetch("/pay", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(body)
+    });
+
+    status.innerText = "Check your phone for STK push";
+
+  }catch(e){
+    status.innerText = "Error occurred";
+  }
 }
+
+/* ================= UI ================= */
+function goBack(){
+  step1.classList.remove("hidden");
+  loginBox.classList.add("hidden");
+  registerBox.classList.add("hidden");
+}
+
 </script>
 
 </body>
