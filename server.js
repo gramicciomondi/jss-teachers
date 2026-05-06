@@ -6,26 +6,23 @@ const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
 const axios = require("axios");
-
-let multer;
-try {
-  multer = require("multer");
-} catch (e) {
-  console.log("⚠️ Multer not installed yet. Run: npm install multer");
-}
+const path = require("path");
 
 const app = express();
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
 
 /* ================= MIDDLEWARE ================= */
 app.use(express.json());
 app.use(cors());
-app.use(express.static(__dirname));
 
-/* ================= DATABASE (SAFE POOL) ================= */
+// ✅ FIXED STATIC FILES (IMPORTANT FOR RENDER)
+app.use(express.static(path.join(__dirname, "public")));
+
+/* ================= ROOT ROUTE ================= */
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+/* ================= DATABASE ================= */
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -68,6 +65,7 @@ const baseURL =
     ? "https://api.safaricom.co.ke"
     : "https://sandbox.safaricom.co.ke";
 
+/* ================= TOKEN ================= */
 async function getAccessToken() {
   try {
     const auth = Buffer.from(
@@ -88,21 +86,24 @@ async function getAccessToken() {
 
 /* ================= SAVE TEMP ================= */
 app.post("/save-teacher-temp", (req, res) => {
-  try {
-    const { tsc_no, name, phone, password, county, subcounty, school } = req.body;
+  const { tsc_no, name, phone, password, county, subcounty, school } = req.body;
 
-    db.query(
-      `INSERT INTO temp_teachers 
-      (tsc_no, name, phone, password, county, subcounty, school)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE name=VALUES(name)`,
-      [tsc_no, name, phone, password, county, subcounty, school],
-      () => res.json({ success: true })
-    );
-  } catch (err) {
-    console.log(err);
-    res.json({ success: false });
-  }
+  db.query(
+    `INSERT INTO temp_teachers 
+    (tsc_no, name, phone, password, county, subcounty, school)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE name=VALUES(name)`,
+
+    [tsc_no, name, phone, password, county, subcounty, school],
+
+    (err) => {
+      if (err) {
+        console.log("TEMP ERROR:", err);
+        return res.json({ success: false });
+      }
+      res.json({ success: true });
+    }
+  );
 });
 
 /* ================= PAY ================= */
@@ -113,7 +114,7 @@ app.post("/pay", async (req, res) => {
     const cleanPhone = phone.replace(/^0/, "254");
 
     const token = await getAccessToken();
-    if (!token) return res.json({ success: false, msg: "Token failed" });
+    if (!token) return res.json({ success: false });
 
     const timestamp = new Date()
       .toISOString()
@@ -150,17 +151,18 @@ app.post("/pay", async (req, res) => {
     );
 
     res.json({ success: true });
+
   } catch (err) {
-    console.log("❌ MPESA ERROR:", err.message);
+    console.log("MPESA ERROR:", err.message);
     res.json({ success: false });
   }
 });
 
-/* ================= CALLBACK (SAFE FIXED) ================= */
+/* ================= CALLBACK ================= */
 app.post("/callback", (req, res) => {
   try {
     const stk = req.body?.Body?.stkCallback;
-    if (!stk) return res.json({});
+    if (!stk) return res.json({ ok: true });
 
     if (stk.ResultCode === 0) {
       const items = stk.CallbackMetadata?.Item || [];
@@ -178,37 +180,34 @@ app.post("/callback", (req, res) => {
     }
 
     res.json({ ok: true });
+
   } catch (err) {
-    console.log("❌ CALLBACK ERROR:", err.message);
-    res.json({ ok: false });
+    console.log("CALLBACK ERROR:", err.message);
+    res.json({ ok: true });
   }
 });
 
 /* ================= CHECK TSC ================= */
 app.post("/check-tsc", (req, res) => {
-  try {
-    db.query(
-      "SELECT * FROM teachers WHERE tsc_no=?",
-      [req.body.tsc_no],
-      (err, result) => {
-        if (err) return res.json({ exists: false });
-        res.json({ exists: result.length > 0 });
-      }
-    );
-  } catch {
-    res.json({ exists: false });
-  }
+  db.query(
+    "SELECT * FROM teachers WHERE tsc_no=?",
+    [req.body.tsc_no],
+    (err, result) => {
+      if (err) return res.json({ exists: false });
+      res.json({ exists: result.length > 0 });
+    }
+  );
 });
 
-/* ================= COUNT TEACHERS ================= */
+/* ================= COUNT ================= */
 app.get("/count-teachers", (req, res) => {
   db.query("SELECT COUNT(*) AS total FROM teachers", (err, result) => {
     if (err) return res.json({ total: 23058 });
 
     const base = 23058;
-    const count = result?.[0]?.total || 0;
+    const dbCount = result?.[0]?.total || 0;
 
-    res.json({ total: base + count });
+    res.json({ total: base + dbCount });
   });
 });
 
